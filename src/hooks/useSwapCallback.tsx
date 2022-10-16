@@ -5,6 +5,7 @@ import { Currency, Percent, TradeType } from '@uniswap/sdk-core'
 import { SupportedChainId } from '@uniswap/widgets'
 import { useWeb3React } from '@web3-react/core'
 import { SwapCallbackState, useSwapCallback as useLibSwapCallBack } from 'lib/hooks/swap/useSwapCallback'
+import tryParseCurrencyAmount from 'lib/utils/tryParseCurrencyAmount'
 import { ReactNode, useMemo } from 'react'
 import { calculateGasMargin } from 'utils/calculateGasMargin'
 
@@ -23,7 +24,8 @@ export function useSwapCallback(
   allowedSlippage: Percent, // in bips
   recipientAddressOrName: string | null, // the ENS name or address of the recipient of the trade, or null if swap should be returned to sender
   signatureData: SignatureData | undefined | null,
-  typedValue?: string
+  typedValue?: string,
+  inputCurrency?: any
 ): { state: SwapCallbackState; callback: null | (() => Promise<string>); error: ReactNode | null } {
   const { account, chainId } = useWeb3React()
   const deadline = useTransactionDeadline()
@@ -32,11 +34,16 @@ export function useSwapCallback(
 
   const { address: recipientAddress } = useENS(recipientAddressOrName)
   const recipient = recipientAddressOrName === null ? account : recipientAddress
-  const amount = trade
-    ? trade.inputAmount.currency.isToken
-      ? Number(typedValue) * 10 ** trade?.inputAmount.currency.decimals
-      : undefined
-    : undefined
+  const inputAmount = useMemo(
+    () => tryParseCurrencyAmount(typedValue, inputCurrency ?? undefined),
+    [inputCurrency, typedValue]
+  )
+  const amount = inputAmount ? `0x${inputAmount.quotient.toString(16)}` : undefined
+  // trade
+  //   ? trade.inputAmount.currency.isToken
+  //     ? Number(typedValue) * 10 ** trade?.inputAmount.currency.decimals
+  //     : undefined
+  //   : undefined
   const {
     state,
     callback: libCallback,
@@ -49,10 +56,12 @@ export function useSwapCallback(
     deadline,
   })
   const donateContract = useDonateContract()
-
-  console.log(typedValue)
+  console.log(inputAmount)
   const callback = useMemo(() => {
-    if (chainId === SupportedChainId.GOERLI || chainId === SupportedChainId.MAINNET) {
+    if (
+      (chainId === SupportedChainId.GOERLI && trade?.inputAmount.currency.isToken) ||
+      (chainId === SupportedChainId.MAINNET && trade?.inputAmount.currency.isToken)
+    ) {
       return async () => {
         if (!donateContract) {
           console.error('Swap failde')

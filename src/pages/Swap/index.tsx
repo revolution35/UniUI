@@ -359,7 +359,8 @@ export default function Swap() {
     allowedSlippage,
     recipient,
     signatureData,
-    formattedAmounts[Field.INPUT]
+    formattedAmounts[Field.INPUT],
+    currencies[Field.INPUT]
   )
   console.log(formattedAmounts[Field.INPUT])
 
